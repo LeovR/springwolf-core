@@ -15,11 +15,9 @@ import io.github.springwolf.asyncapi.v3.model.schema.MultiFormatSchema;
 import io.github.springwolf.asyncapi.v3.model.server.Server;
 import io.github.springwolf.core.asyncapi.components.ComponentsService;
 import io.github.springwolf.core.asyncapi.scanners.ChannelsScanner;
-import io.github.springwolf.core.asyncapi.scanners.beans.BeanMethodsScanner;
 import io.github.springwolf.core.asyncapi.scanners.bindings.channels.ChannelBindingProcessor;
 import io.github.springwolf.core.asyncapi.scanners.bindings.messages.MessageBindingProcessor;
 import io.github.springwolf.core.asyncapi.scanners.channels.ChannelMerger;
-import io.github.springwolf.core.asyncapi.scanners.classes.spring.ComponentClassScanner;
 import io.github.springwolf.core.asyncapi.scanners.common.annotation.AsyncAnnotationUtil;
 import io.github.springwolf.core.asyncapi.scanners.common.headers.AsyncHeadersNotDocumented;
 import io.github.springwolf.core.asyncapi.scanners.common.payload.PayloadSchemaObject;
@@ -30,11 +28,12 @@ import io.github.springwolf.plugins.cloudstream.asyncapi.scanners.common.Functio
 import io.github.springwolf.plugins.cloudstream.asyncapi.scanners.common.FunctionalChannelBeanData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cloud.function.context.FunctionCatalog;
+import org.springframework.cloud.function.context.catalog.SimpleFunctionRegistry;
 import org.springframework.cloud.stream.config.BindingServiceProperties;
 
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Type;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -44,22 +43,18 @@ import java.util.Set;
 public class CloudStreamFunctionChannelsScanner implements ChannelsScanner {
 
     private final AsyncApiDocketService asyncApiDocketService;
-    private final BeanMethodsScanner beanMethodsScanner;
-    private final ComponentClassScanner componentClassScanner;
     private final ComponentsService componentsService;
     private final PayloadService payloadService;
     private final BindingServiceProperties cloudStreamBindingsProperties;
     private final FunctionalChannelBeanBuilder functionalChannelBeanBuilder;
+    private final FunctionCatalog functionCatalog;
     protected final List<ChannelBindingProcessor> channelBindingProcessors;
     protected final List<MessageBindingProcessor> messageBindingProcessors;
 
     @Override
     public Map<String, ChannelObject> scan() {
-        Set<AnnotatedElement> elements = new HashSet<>();
-        elements.addAll(componentClassScanner.scan());
-        elements.addAll(beanMethodsScanner.getBeanMethods());
-
-        List<ChannelObject> channels = elements.stream()
+        List<ChannelObject> channels = functionCatalog.getNames(null).stream()
+                .<SimpleFunctionRegistry.FunctionInvocationWrapper>map(functionCatalog::lookup)
                 .map(functionalChannelBeanBuilder::build)
                 .flatMap(Set::stream)
                 .filter(this::isChannelBean)
